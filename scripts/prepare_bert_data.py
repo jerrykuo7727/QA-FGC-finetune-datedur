@@ -48,6 +48,9 @@ if __name__ == '__main__':
             # QA pairs
             QAs = []
             for QA in PQA['QUESTIONS']:
+                if QA['AMODE'] != "Single-Span-Extraction":
+                    continue
+ 
                 processed_QA = {}
                 raw_question = QA['QTEXT'].strip()
                 question = tokenizer.tokenize(raw_question)

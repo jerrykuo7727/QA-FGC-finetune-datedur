@@ -1,17 +1,17 @@
 #!/bin/bash
 
-python3_cmd=python3
+python3_cmd=python3.6
 
-stage=0
+stage=2
 use_gpu=cuda:0
 
 model=bert  # (bert|xlnet)
-model_path=/home/M10815022/Models/bert-wwm-ext
-save_path=./models/bert
+model_path=/home/M10815022/Models/roberta-base-lm-finetune
+save_path=./models/roberta-base-lm-finetune-1.7-wodevtest-woASR
 
-train_datasets="DRCD_train DRCD_dev DRCD_test Lee_train Lee_dev Lee_test Kaggle_train Kaggle_dev Kaggle_test ASR_train ASR_dev ASR_test FGC_release_A_train"
-dev_datasets="FGC_release_A_dev"
-test_datasets="FGC_release_A_test"
+train_datasets="DRCD_train Lee_train Kaggle_train FGC_release_all_train"
+dev_datasets="DRCD_dev Lee_dev Kaggle_dev FGC_release_all_dev"
+test_datasets="DRCD_test Lee_test Kaggle_test FGC_release_all_test"
 
 
 if [ $stage -le 0 ]; then
@@ -37,12 +37,12 @@ if [ $stage -le 1 ]; then
       mkdir -p data/$split/$dir
     done
   done
-  echo "Preparing train set..."
-  $python3_cmd scripts/prepare_${model}_data.py $model_path train $train_datasets || exit 1
   echo "Preparing dev set..."
   $python3_cmd scripts/prepare_${model}_data.py $model_path dev $dev_datasets || exit 1
   echo "Preparing test set..."
   $python3_cmd scripts/prepare_${model}_data.py $model_path test $test_datasets || exit 1
+  echo "Preparing train set..."
+  $python3_cmd scripts/prepare_${model}_data.py $model_path train $train_datasets || exit 1
 fi
 
 
