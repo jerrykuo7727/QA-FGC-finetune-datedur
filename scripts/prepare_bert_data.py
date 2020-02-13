@@ -48,7 +48,9 @@ if __name__ == '__main__':
             # QA pairs
             QAs = []
             for QA in PQA['QUESTIONS']:
-                if QA['AMODE'] != "Single-Span-Extraction":
+                if QA['AMODE'] != 'Single-Span-Extraction' and \
+                   'Single-Span-Extraction' not in QA['AMODE'] or \
+                   'ANSWER' not in QA:
                     continue
  
                 processed_QA = {}

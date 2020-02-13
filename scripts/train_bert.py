@@ -14,7 +14,7 @@ from evaluate import f1_score, exact_match_score, metric_max_over_ground_truths
 np.random.seed(42)
 torch.manual_seed(42)
 
-norm_tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
+norm_tokenizer = BertTokenizer.from_pretrained('/home/M10815022/Models/bert-wwm-ext')
 
 
 def validate_dataset(model, split, tokenizer, topk=1, prefix=None):
@@ -39,8 +39,8 @@ def validate_dataset(model, split, tokenizer, topk=1, prefix=None):
         start_logits, end_logits = outputs[0], outputs[1]
         start_logits += margin_mask
         end_logits += margin_mask
-        start_logits = start_logits.cpu()
-        fwd_end_logits = end_logits.cpu()
+        start_logits = start_logits.cpu().clone()
+        fwd_end_logits = end_logits.cpu().clone()
         
         start_probs = softmax(start_logits, dim=1)
         fwd_start_probs, fwd_start_index = start_probs.topk(topk*5, dim=1)
@@ -57,8 +57,8 @@ def validate_dataset(model, split, tokenizer, topk=1, prefix=None):
         start_logits, end_logits = outputs[0], outputs[1]
         start_logits += margin_mask
         end_logits += margin_mask
-        start_logits = start_logits.cpu()
-        bwd_end_logits = end_logits.cpu()
+        start_logits = start_logits.cpu().clone()
+        bwd_end_logits = end_logits.cpu().clone()
 
         start_probs = softmax(start_logits, dim=1)
         bwd_start_probs, bwd_start_index = start_probs.topk(topk*5, dim=1)
@@ -114,22 +114,22 @@ def validate_dataset(model, split, tokenizer, topk=1, prefix=None):
                     probs[preds.index(pred)] += prob
                 else:
                     pass
-            
-            sorted_probs_preds = list(reversed(sorted(zip(probs, preds))))
-            probs, preds = map(list, zip(*sorted_probs_preds))
-            probs, preds = probs[:topk], preds[:topk]
-                
-            norm_preds_tokens = [norm_tokenizer.basic_tokenizer.tokenize(pred) for pred in preds]
-            norm_preds = [norm_tokenizer.convert_tokens_to_string(norm_pred_tokens) for norm_pred_tokens in norm_preds_tokens]
-            norm_answer_tokens = [norm_tokenizer.basic_tokenizer.tokenize(ans) for ans in answer]
-            norm_answer = [norm_tokenizer.convert_tokens_to_string(ans_tokens) for ans_tokens in norm_answer_tokens]
-            
+
             count += 1
             if len(preds) > 0:
+                sorted_probs_preds = list(reversed(sorted(zip(probs, preds))))
+                probs, preds = map(list, zip(*sorted_probs_preds))
+                probs, preds = probs[:topk], preds[:topk]
+                
+                norm_preds_tokens = [norm_tokenizer.basic_tokenizer.tokenize(pred) for pred in preds]
+                norm_preds = [norm_tokenizer.convert_tokens_to_string(norm_pred_tokens) for norm_pred_tokens in norm_preds_tokens]
+                norm_answer_tokens = [norm_tokenizer.basic_tokenizer.tokenize(ans) for ans in answer]
+                norm_answer = [norm_tokenizer.convert_tokens_to_string(ans_tokens) for ans_tokens in norm_answer_tokens]
+            
                 em += max(metric_max_over_ground_truths(exact_match_score, norm_pred, norm_answer) for norm_pred in norm_preds)
                 f1 += max(metric_max_over_ground_truths(f1_score, norm_pred, norm_answer) for norm_pred in norm_preds)
             
-    del dataloader
+    del fwd_dataloader, bwd_dataloader
     return em, f1, count
 
 def validate(model, tokenizer, topk=1, prefix=None):
@@ -202,11 +202,10 @@ if __name__ == '__main__':
             if step % update_stepsize == 0:
                 optimizer.step()
                 optimizer.zero_grad()
-    
-            if step % 3000 == 0:
+            
+            if step % 1500 == 0:
                 print("step %d | Validating..." % step)
                 val_f1 = validate(model, tokenizer, topk=1)
-                validate(model, tokenizer, topk=1, prefix='FGC')
                 if val_f1 > best_val:
                     patience = 0
                     best_val = val_f1
@@ -221,7 +220,5 @@ if __name__ == '__main__':
                 model.load_state_dict(best_state_dict)
                 for k in range(1, 6):
                     validate(model, tokenizer, topk=k)
-                for k in range(1, 6):
-                    validate(model, tokenizer, topk=k, prefix='FGC')
                 del model, dataloader
                 exit(0)
