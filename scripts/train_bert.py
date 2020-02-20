@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import torch
 from torch.nn.functional import softmax
+from torch.nn.utils import clip_grad_norm_
 from transformers import BertTokenizer, BertForQuestionAnswering
 
 from utils import AdamW
@@ -66,14 +67,14 @@ def validate_dataset(model, split, tokenizer, topk=1, prefix=None):
         # FWD-BWD
         for i, answer in enumerate(answers):
             preds, probs = [], []
-            for n in range(topk*5):
+            for n in range(topk):
                 # FWD
                 start_ind = fwd_start_index[i][n].item()
                 beam_end_logits = fwd_end_logits[i].clone().unsqueeze(0)
-                beam_end_logits[0, :start_ind] += -1e10
-                beam_end_logits[0, start_ind+20:] += -1e10
 
                 end_probs = softmax(beam_end_logits, dim=1)
+                end_probs[0, :start_ind] += -1e10
+                end_probs[0, start_ind+20:] += -1e10
                 end_probs, end_index = end_probs.topk(1, dim=1)
                 end_ind = end_index[0][0]
 
@@ -87,17 +88,20 @@ def validate_dataset(model, split, tokenizer, topk=1, prefix=None):
                     probs.append(prob)
                     preds.append(pred)
                 elif pred and pred in preds:
-                    probs[preds.index(pred)] += prob
+                    pred_idx = preds.index(pred)
+                    if prob > probs[pred_idx]:
+                        probs[pred_idx] = prob
+                    #probs[preds.index(pred)] += prob
                 else:
                     pass
                 
                 # BWD
                 start_ind = bwd_start_index[i][n].item()
                 beam_end_logits = bwd_end_logits[i].clone().unsqueeze(0)
-                beam_end_logits[0, :start_ind] += -1e10
-                beam_end_logits[0, start_ind+20:] += -1e10
 
                 end_probs = softmax(beam_end_logits, dim=1)
+                end_probs[0, :start_ind] += -1e10
+                end_probs[0, start_ind+20:] += -1e10
                 end_probs, end_index = end_probs.topk(1, dim=1)
                 end_ind = end_index[0][0]
 
@@ -111,7 +115,10 @@ def validate_dataset(model, split, tokenizer, topk=1, prefix=None):
                     probs.append(prob)
                     preds.append(pred)
                 elif pred and pred in preds:
-                    probs[preds.index(pred)] += prob
+                    pred_idx = pred.index(pred)
+                    if prob > probs[pred_idx]:
+                        probs[pred_idx] = prob
+                    #probs[preds.index(pred)] += prob
                 else:
                     pass
 
@@ -165,7 +172,6 @@ if __name__ == '__main__':
     
     assert accumulate_batch_size % batch_size == 0
     update_stepsize = accumulate_batch_size // batch_size
-
     
     model_path = sys.argv[2]
     tokenizer = BertTokenizer.from_pretrained(model_path)
@@ -181,6 +187,10 @@ if __name__ == '__main__':
     patience, best_val = 0, 0
     best_state_dict = model.state_dict()
     dataloader = get_dataloader('bert', 'train', tokenizer, batch_size=batch_size, num_workers=16)
+    n_step_per_epoch = len(dataloader)
+    n_step_per_validation = n_step_per_epoch // 5
+    print('%d steps per epoch.' % n_step_per_epoch)
+    print('%d steps per validation.' % n_step_per_validation)
 
     print('Start training...')
     while True:
@@ -203,7 +213,7 @@ if __name__ == '__main__':
                 optimizer.step()
                 optimizer.zero_grad()
             
-            if step % 1500 == 0:
+            if step % n_step_per_validation == 0:
                 print("step %d | Validating..." % step)
                 val_f1 = validate(model, tokenizer, topk=1)
                 if val_f1 > best_val:
@@ -220,5 +230,8 @@ if __name__ == '__main__':
                 model.load_state_dict(best_state_dict)
                 for k in range(1, 6):
                     validate(model, tokenizer, topk=k)
+                print('Scoring 1-best for all test splits...')
+                for prefix in ('DRCD', 'Kaggle', 'Lee', 'ASR', 'FGC'):
+                    validate(model, tokenizer, topk=k, prefix=prefix)
                 del model, dataloader
                 exit(0)
