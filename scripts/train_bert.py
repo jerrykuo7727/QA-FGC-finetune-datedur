@@ -230,8 +230,9 @@ if __name__ == '__main__':
                 model.load_state_dict(best_state_dict)
                 for k in range(1, 6):
                     validate(model, tokenizer, topk=k)
+
                 print('Scoring 1-best for all test splits...')
-                for prefix in ('DRCD', 'Kaggle', 'Lee', 'ASR', 'FGC'):
-                    validate(model, tokenizer, topk=k, prefix=prefix)
+                for prefix in ('DRCD', 'Kaggle', 'Lee', 'FGC'):
+                    validate(model, tokenizer, topk=1, prefix=prefix)
                 del model, dataloader
                 exit(0)
