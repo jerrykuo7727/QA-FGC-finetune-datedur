@@ -52,6 +52,7 @@ class DateDurationQA():
         self.max_length = 20
         
     def chinese2digits(self, chn):
+        chn = chn.replace('两', '二')
         def _trans(s):
             num = 0
             if s:
