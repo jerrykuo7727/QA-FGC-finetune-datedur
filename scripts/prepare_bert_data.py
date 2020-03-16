@@ -52,10 +52,16 @@ if __name__ == '__main__':
             # QA pairs
             QAs = []
             for QA in PQA['QUESTIONS']:
-                if QA['AMODE'] != 'Single-Span-Extraction' and \
-                   'Single-Span-Extraction' not in QA['AMODE'] or \
-                   'ANSWER' not in QA:
-                    continue
+                if split == 'train':
+                    if QA['AMODE'] != 'Single-Span-Extraction' and \
+                       'Single-Span-Extraction' not in QA['AMODE'] or \
+                       'ANSWER' not in QA:
+                        continue
+                else:
+                    if QA['AMODE'] != 'Date-Duration' and \
+                       'Date-Duration' not in QA['AMODE'] or \
+                       'ANSWER' not in QA:
+                        continue
  
                 processed_QA = {}
                 raw_question = QA['QTEXT'].strip()
@@ -77,8 +83,16 @@ if __name__ == '__main__':
                 answer_end = answer_start + len(answer_no_unk) - 1 if answer_start >= 0 else -1
                 if answer_start < 0:
                     impossible_questions += 1
-
-                if answer_start >= 0 or split != 'train':
+                    
+                if split != 'train':
+                    processed_QA['question'] = raw_question
+                    processed_QA['question_no_unk'] = raw_question
+                    processed_QA['answer'] = raw_answers
+                    processed_QA['answer_start'] = -1
+                    processed_QA['answer_end'] = -1
+                    processed_QA['id'] = QA['QID']
+                    QAs.append(processed_QA)
+                elif answer_start >= 0:
                     processed_QA['question'] = question
                     processed_QA['question_no_unk'] = question_no_unk
                     processed_QA['answer'] = raw_answers
@@ -89,12 +103,18 @@ if __name__ == '__main__':
 
             # Save processed data
             with open('data/%s/passage/%s|%s' % (split, dataset, PID), 'w') as f:
-                assert passage == ' '.join(passage).split(' ')
-                f.write(' '.join(passage))
+                if split == 'train':
+                    assert passage == ' '.join(passage).split(' ')
+                    f.write(' '.join(passage))
+                else:
+                    f.write(raw_passage)
 
             with open('data/%s/passage_no_unk/%s|%s' % (split, dataset, PID), 'w') as f:
-                assert passage_no_unk == ' '.join(passage_no_unk).split(' ')
-                f.write(' '.join(passage_no_unk))
+                if split == 'train':
+                    assert passage_no_unk == ' '.join(passage_no_unk).split(' ')
+                    f.write(' '.join(passage_no_unk))
+                else:
+                    f.write(raw_passage)
 
             for QA in QAs:
                 question = QA['question']
@@ -104,11 +124,17 @@ if __name__ == '__main__':
                 answer_end = QA['answer_end']
                 QID = QA['id']
                 with open('data/%s/question/%s|%s|%s' % (split, dataset, PID, QID), 'w') as f:
-                    assert question  == ' '.join(question).split(' ')
-                    f.write(' '.join(question))
+                    if split == 'train':
+                        assert question  == ' '.join(question).split(' ')
+                        f.write(' '.join(question))
+                    else:
+                        f.write(question)
                 with open('data/%s/question_no_unk/%s|%s|%s' % (split, dataset, PID, QID), 'w') as f:
-                    assert question_no_unk  == ' '.join(question_no_unk).split(' ')
-                    f.write(' '.join(question_no_unk))
+                    if split == 'train':
+                        assert question_no_unk  == ' '.join(question_no_unk).split(' ')
+                        f.write(' '.join(question_no_unk))
+                    else:
+                        f.write(question_no_unk)
                 with open('data/%s/answer/%s|%s|%s' % (split, dataset, PID, QID), 'w') as f:
                     for answer in answers:
                         f.write('%s\n' % answer)

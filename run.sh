@@ -1,17 +1,17 @@
 #!/bin/bash
 
-python3_cmd=python3
+python3_cmd=python3.6
 
-stage=0
-use_gpu=cuda:0
+stage=2
+use_gpu=cuda:2
 
 model=bert
 model_path=/home/M10815022/Models/roberta-wwm-ext
-save_path=./models/roberta-1.7.2-woASR
+save_path=./models/roberta-1.7.8-ALLwoASR-finetune-datedur
 
-train_datasets="DRCD_train Lee_train Kaggle_train FGC_release_all_train DROP_train"
-dev_datasets="DRCD_dev Lee_dev Kaggle_dev FGC_release_all_dev DROP_dev"
-test_datasets="DRCD_test Lee_test Kaggle_test FGC_release_all_test"
+train_datasets="DRCD_train DRCD_dev DRCD_test Lee_train Lee_dev Lee_test Kaggle_train Kaggle_dev Kaggle_test FGC_release_all_train"
+dev_datasets="FGC_release_all_dev"
+test_datasets="FGC_release_all_test"
 
 
 if [ $stage -le 0 ]; then
@@ -54,5 +54,5 @@ if [ $stage -le 2 ]; then
     echo "'$save_path' already exists! Please remove it and try again."; exit 1
   fi
   mkdir -p $save_path
-  $python3_cmd scripts/train_${model}.py $use_gpu $model_path $save_path
+  $python3_cmd scripts/train_${model}_datedur.py $use_gpu $model_path $save_path
 fi

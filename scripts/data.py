@@ -75,6 +75,29 @@ class BertDataset(Dataset):
         else:
             margin_mask = torch.FloatTensor([*(-1e10 for _ in question), *(0. for _ in passage[:-1]), -1e-10])
             return input_ids, attention_mask, token_type_ids, margin_mask, input_tokens_no_unk, answer
+        
+class TestBertDataset(Dataset):
+    def __init__(self, split, tokenizer, bwd=False, prefix=None):
+        assert split in ('dev', 'test')
+        self.split = split
+        self.question_list = os.listdir('data/%s/question' % split)
+        self.tokenizer = tokenizer
+        self.bwd = bwd
+        if prefix:
+             self.question_list = [q for q in self.question_list if q.startswith(prefix)]
+    
+    def __len__(self):
+        return len(self.question_list)
+        
+    def __getitem__(self, i):
+        question_id = self.question_list[i]
+        with open('data/%s/passage/%s' % (self.split, '|'.join(question_id.split('|')[:2]))) as f:
+            passage = f.read()
+        with open('data/%s/question/%s' % (self.split, question_id)) as f:
+            question = f.read()
+        with open('data/%s/answer/%s' % (self.split, question_id)) as f:
+            answer = [line.strip() for line in f]
+        return passage, question, answer
 
 class XLNetDataset(Dataset):
     def __init__(self, split, tokenizer, bwd=False, prefix=None):
@@ -162,18 +185,16 @@ def get_dataloader(model_type, split, tokenizer, bwd=False, batch_size=1, num_wo
         return input_ids, attention_mask, token_type_ids, start_positions, end_positions
     
     def test_collate_fn(batch):
-        input_ids, attention_mask, token_type_ids, margin_mask, input_tokens_no_unk, answers = zip(*batch)
-        input_ids = pad_sequence(input_ids, batch_first=True)
-        attention_mask = pad_sequence(attention_mask, batch_first=True)
-        token_type_ids = pad_sequence(token_type_ids, batch_first=True, padding_value=1)
-        margin_mask = pad_sequence(margin_mask, batch_first=True, padding_value=1e-10)
-        return input_ids, attention_mask, token_type_ids, margin_mask, input_tokens_no_unk, answers
+        return batch
     
     assert model_type in ('bert', 'xlnet')
     shuffle = split == 'train'
     collate_fn = train_collate_fn if split == 'train' else test_collate_fn
     if model_type == 'bert':
-        dataset = BertDataset(split, tokenizer, bwd, prefix)
+        if split == 'train':
+            dataset = BertDataset(split, tokenizer, bwd, prefix)
+        else:
+            dataset = TestBertDataset(split, tokenizer, bwd, prefix)
     elif model_type == 'xlnet':
         dataset = XLNetDataset(split, tokenizer, bwd, prefix)
     dataloader = DataLoader(dataset, collate_fn=collate_fn, shuffle=shuffle, \
